@@ -85,7 +85,7 @@ def take_individual_stat(analyzed):
     'Clearances':Clearances})
     return data
 # Gets the specified stats for atackers and puts them in the db
-def atacking_stats(df):
+'''def atacking_stats(df):
     atacking_data = pd.read_csv('Data Set/Atacking Data.csv')
     atacking_data = atacking_data.drop(index=atacking_data[atacking_data['Rk'] == 'Rk'].index)
     atacking_data = atacking_data.loc[:,['Player','90s','SoT/90','SoT%']]
@@ -94,53 +94,79 @@ def atacking_stats(df):
     atacking_data.loc[:,'SoT%']=pd.to_numeric(atacking_data.loc[:,'SoT%'])
     atacking_data.loc[:,'SoT/90']=pd.to_numeric(atacking_data.loc[:,'SoT/90'])
     atacking_data.loc[:,'90s']=pd.to_numeric(atacking_data.loc[:,'90s'])
-    return pd.merge(df,atacking_data,on="Player")
+    return pd.merge(df,atacking_data,on="Player")'''
 # Normilices the individual stats and add them up multiplied by the weight of the stat
-def rating_calculator(data,position):
+def rating_calculator(data,position,total_data):
     data=data.drop_duplicates('Player',keep='first')
     jugadores, gas,media= [],[],[]
     players = data.loc[:,'Player'].values.tolist()
     weights = json.load(open('weights.json'))
     data.set_index('Player',inplace=True)
-    std = data.std()
-    median = data.median()
-    stats = ['Non-Penalty xG','Shots Total','xAG','npxG + xAG','Shot-Creating Actions','Passes Attempted','Pass Completion %','Progressive Passes','Progressive Carries','Successful Take-Ons','Touches (Att Pen)','Progressive Passes Rec','Tackles','Interceptions','Blocks','Clearances','Aerials won','SoT/90','SoT%','90s']
-
-    
+    data['npxG + xAG'] = data['xAG'] + data['npxG']
+    data['TklW%'] = round((data['TklW']/data['Tkl']),2)
+    total_data['npxG + xAG'] = total_data['xAG'] + total_data['npxG']
+    total_data['TklW%'] = round((total_data['TklW']/total_data['Tkl']),2)
+    stats = ['npxG','xAG','npxG + xAG','SCA','Att','Cmp%','PrgP','PrgC','Succ%','PPA','PrgR','Tkl','Int','Blocks','Clr','Won%','Sh','SoT%','90s','KP','1/3','CrsPA','GCA','TklW%','Err','Touches','Dis','Mis','Recov','PKwon','Fld','Fls']
+    total_data = total_data.loc[:,stats]
+    std = total_data.std()
+    median = total_data.median()
     for player in players:
         rating = 0
         for stat in stats:
-            non_pk = data.loc[player,'Non-Penalty Goals']
+            non_pk = data.loc[player,'G-PK']
             matches= data.loc[player,'90s']
-            assits = data.loc[player,'Assists']
-            rating += (data.loc[player,stat]- median[stat])/std[stat] * 0.05 * weights[position[0]][stats.index(stat)]
-        ga= matches * assits + matches * non_pk
+            assits = data.loc[player,'Ast']
+            own_goals = data.loc[player,'OG']
+            rating += (data.loc[player,stat]- median[stat])/std[stat] * 0.05 * weights[position][stats.index(stat)]
+        ga= assits + non_pk - own_goals
         jugadores += [player]
         media += [rating]
         gas += [ga]
     return pd.DataFrame({'player':jugadores,'rating':media,'goals+assists':gas})
 # Normilices the g/a and the rating obtained in the previous method, then it adds them up
-def second_normalization(data,position, path):
-    rating = rating_calculator(data,position)
-    players=rating.loc[:,'player'].tolist()
-    rating.set_index('player',inplace=True)
-    median = rating.median()
-    std = rating.std()
-    ratings ={}
-    if position[0] == 'F':
-        goal_weight = 1
-    elif position[0] == 'W' or position == 'M':
-        goal_weight = 0.7
+def final_rating(year=2017):
+    while year < 2023:
+        for e in ['F','M','D']:
+            total_data = pd.read_csv(f'C:/Users/ignac/Documents/Documentos/Football/Futty Data/Rating Code/Data Sets/Stats/{year}/total_top_5.csv')
+            data = pd.read_csv(f'C:/Users/ignac/Documents/Documentos/Football/Futty Data/Rating Code/Data Sets/Stats/{year}/transfered_players_top_5.csv')
+            if e == 'F':
+                data = data.loc[(data['Pos'] == 'FW') | (data['Pos'] == 'FW,MF') | (data['Pos'] == 'FW,DF')]
+                total_data = total_data.loc[(total_data['Pos'] == 'FW') | (total_data['Pos'] == 'FW,MF') | (total_data['Pos'] == 'FW,DF')]
+            elif e == 'M':
+                data = data.loc[(data['Pos'] == 'MF') |  (data['Pos'] == 'MF,DF') | (data['Pos'] == 'MF,FW')]
+                total_data = total_data.loc[(total_data['Pos'] == 'MF') |  (total_data['Pos'] == 'MF,DF') | (total_data['Pos'] == 'MF,FW')]
+            elif e == 'D':
+                data = data.loc[(data['Pos'] == 'DF') |  (data['Pos'] == 'DF,MF') | (data['Pos'] == 'DF,FW')]
+                total_data = total_data.loc[(total_data['Pos'] == 'DF') |  (total_data['Pos'] == 'DF,MF') | (total_data['Pos'] == 'DF,FW')]
+            print(data)
+            rating = rating_calculator(data,e,total_data)
+            players=rating.loc[:,'player'].tolist()
+            rating.set_index('player',inplace=True)
+            median = rating.median()
+            std = rating.std()
+            ratings ={}
+            non_ga = []
+            ga = []
+            for player in players:
+                rating_deviation = (rating.loc[player,'rating']- median['rating'])/std['rating']
+                ga_deviation = (rating.loc[player,'goals+assists']- median['goals+assists'])/std['goals+assists']
+                non_ga += [rating_deviation]
+                ga += [ga_formula(ga_deviation,e,std,median)]
+                ratings[player] = rating_deviation + ga_formula(ga_deviation,e,std,median)
+            pd.DataFrame({'Name':ratings.keys(),'Rating':ratings.values()}).sort_values(by='Rating',ascending=False).to_csv(f'C:/Users/ignac/Documents/Documentos/Football/Futty Data/Rating Code/Data Sets/Stats/Ratings/{year}_{e}_rating.csv')
+        year += 1
+
+def ga_formula(ga,e,std,median):
+    if e == 'F':
+        gas = ga * std['goals+assists'] + median['goals+assists']
+        if (gas < 25):
+            return gas/5
+        else:
+            return (1.065**gas+0.1723) # Geogebra function
+    if e == 'M':
+        return ga/2 #El Rating fluctua entre (4,-2) y de goles 20 serán 8 en la normalización y  
     else:
-        goal_weight = 0.5
-    for player in players:
-        rating_deviation = (rating.loc[player,'rating']- median['rating'])/std['rating']
-        ga_deviation = (rating.loc[player,'goals+assists']- median['goals+assists'])/std['goals+assists']
-        ratings[player] = rating_deviation + goal_weight * ga_deviation + 3.25 # The 3 is so the lowest number is >0
-    pd.DataFrame({'Name':ratings.keys(),'Rating':ratings.values()}).sort_values(by='Rating',ascending=False).to_csv(path +f'{position[1]}_{position[0]}_rating.csv')
+        return ga/3 #En Rating fluctuan entre (3,-2) y de goles 10 serán 5 en la normalización y 1.66 
+    
 
-def calculate_all_ratings(path):
-    positions = ['Forwards', 'AtMid_Wingers','Midfielders','CenterBacks','FullBacks']
-    for analyzed in positions:
-        second_normalization(atacking_stats(take_individual_stat(analyzed)),position_selector(analyzed),path)
-
+final_rating()

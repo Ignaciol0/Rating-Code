@@ -17,7 +17,23 @@ NON-GK
   'Interceptions',
   'Blocks',
   'Clearances',
-  'Aerials won']
+  'Aerials won',
+  'Key Passes',
+  'Final Third Passes',
+  'Crosses in the Penalty Area',
+  'Goal Creating Actions',
+  'Shot on Target %',
+  'Tackle Won %',
+  'Errors',
+  'Touches',
+  'Disposesd',
+  'Miscontrols',
+  'Ball Recoveries',
+  'Penalties Won',
+  'Fouls Drawn',
+  'Fouls Comited',
+  'Own goals']
+
 
 GK
 ['PSxG-GA',

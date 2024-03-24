@@ -2,9 +2,9 @@ import pandas as pd
 from RatingCalculator import calculate_all_ratings
 import os
 
-path = 'C:/Users/ignac/Documents/Documentos/Football/Futty Data/Rating Code/Data Set/Stats'
+path = 'C:/Users/ignac/Documents/Documentos/Football/Futty Data/Rating Code/Data Sets/Stats'
 output_path = 'C:/Users/ignac/Documents/Documentos/Football/Futty Data/Rating Code'
-def merge_data_sets():
+def merge_values_players(path):
     mid = pd.read_csv(path + 'Midfielders.csv',index_col=None)
     fb = pd.read_csv(path + 'FullBacks.csv',index_col=None)
     fw = pd.read_csv(path + 'Forwards.csv',index_col=None)
@@ -59,4 +59,3 @@ def merge_ratings_data(path):
     db = mid._append(fb._append(fw._append(wing._append(cb))))
     pd.merge(merge_data_sets(), db, on='Name').loc[:,['Name','position','market_value_in_eur','age in days','contract expiry','Rating']].to_csv(output_path + 'rating.csv')
 
-merge_ratings_data(path)
